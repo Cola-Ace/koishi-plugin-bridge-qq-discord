@@ -22,7 +22,7 @@ export default class ProcessorDiscord {
 		for (const element of elements.length === 0 ? message_data.quote.elements : elements) {
 			switch (element.type) {
 				case "text": {
-					if (Blacklist.check(element.attrs.content)) return; // 黑名单检测
+					if (Blacklist.check(element.attrs.content)) return ""; // 黑名单检测
 
 					message += element.attrs.content;
 

@@ -9,6 +9,8 @@ import { convertMsTimestampToISO8601, logger, BlacklistDetector, getBinary, gene
 import ProcessorQQ from './qq';
 import { getWebhook } from "./discord/webhook";
 import ProcessorDiscord from './discord';
+import onDiscordMessageDeleted from './discord/message/delete';
+import onDiscordMessageUpdated from './discord/message/update';
 
 export const name = 'bridge-qq-discord';
 
@@ -16,10 +18,12 @@ export const inject = ["database"]
 
 const main = async (ctx: Context, config: Config, session: Session) => {
   const sender = session.event.user;
+  if (!sender) return; // 避免 sender 为空导致的错误
+
   if (sender.id === session.bot.selfId) return; // 避免回环
 
   const pattern = /\[QQ:\d+\]/;
-  if (pattern.test(sender.name)) return; // 不转发自己消息
+  if (pattern.test(sender.name ?? "[QQ:10000]")) return; // 不转发自己消息
 
   const platform = session.event.platform;
   const self_id = session.event.selfId;
@@ -37,15 +41,13 @@ const main = async (ctx: Context, config: Config, session: Session) => {
     logger.info("-------End--------");
   }
 
-  // 检测是否为QQ文件发送
-  let is_qq_file = true;
-  if ("id" in message_data) is_qq_file = false;
-  if (is_qq_file) return;
+  // 如果 message_data 不包含 id 字段，则代表该消息为 QQ 文件的占位符消息，直接跳过
+  if (!(message_data && "id" in message_data)) return;
 
   let nickname = sender.isBot ? sender.name : ("member" in session.event ? session.event.member.nick : sender.name); // 判断是否为 bot
 
   // const elements = message_data.elements.filter(element => element.type !== "at"); // 确保没有@格式
-  const elements = message_data.elements;
+  const elements = message_data.elements ?? [];
 
   if (elements.length <= 0 && !Object.keys(message_data).includes("quote")) return;
 
@@ -216,12 +218,12 @@ const main = async (ctx: Context, config: Config, session: Session) => {
             if ("quote" in message_data && message_data.content === "") { // 处理转发消息事件和标注消息事件
               const data = await dc_bot.internal.getChannelMessage(channel_id, message_data.id);
 
-              if (data.type === 6) return; // 标注消息事件
+              if (data.type === 6) return; // Discord 标注消息事件
 
               const guild_id = await dc_bot.internal.getChannel(message_data.quote.channel.id);
               const quoted_nick = message_data.quote.user.nick === null ? message_data.quote.user.name : message_data.quote.user.nick;
 
-              message += `===== 转发消息 =====\nhttps://discord.com/channels/${guild_id["guild_id"]}/${message_data.quote.channel.id}/${message_data.quote.id}\n===== 以下为转发内容 =====\n${h.image(`${message_data.quote.user.avatar}?size=64`)}\n${quoted_nick.indexOf("[QQ:") !== -1 ? "" : "[Discord] "}${quoted_nick}:\n`;
+              message += `===== 转发消息 =====\nhttps://discord.com/channels/${guild_id["guild_id"]}/${message_data.quote.channel.id}/${message_data.quote.id}\n===== 以下为转发内容 =====\n${config.show_discord_avatar ? h.image(`${message_data.quote.user.avatar}?size=64`) : ""}${quoted_nick.indexOf("[QQ:") !== -1 ? "" : "[Discord] "}${quoted_nick}:\n`;
             }
 
             if ("quote" in message_data && elements.length !== 0) {
@@ -252,7 +254,7 @@ const main = async (ctx: Context, config: Config, session: Session) => {
               nickname = member.nick === null ? member.user.global_name : member.nick;
             }
 
-            // 处理 Discord 默认头像颜色
+            // Process Discord default avatar
             let avatar_color = "";
             let avatar = `${sender.avatar}?size=64`;
             if (sender.avatar === null) {
@@ -266,7 +268,7 @@ const main = async (ctx: Context, config: Config, session: Session) => {
             // https://github.com/Cola-Ace/koishi-plugin-bridge-discord-qq/issues/7
             // const avatar = sender.avatar === null ? "https://cdn.discordapp.com/embed/avatars/0.png" : `${sender.avatar}?size=64`;
 
-            let message_content = `${quoted_message_id === null ? "" : h.quote(quoted_message_id)}${h.image(avatar)}[Discord] ${nickname}:\n${message}`;
+            let message_content = `${quoted_message_id === null ? "" : h.quote(quoted_message_id)}${config.show_discord_avatar ? h.image(avatar) : ""}[Discord] ${nickname}:\n${message}`;
             if (config.file_processor === "Koishi") {
               const [avatar_blob, avatar_type, avatar_error] = await getBinary(avatar, ctx.http);
               if (avatar_error) {
@@ -275,7 +277,7 @@ const main = async (ctx: Context, config: Config, session: Session) => {
               }
               const avatar_arrayBuffer = await avatar_blob.arrayBuffer();
               const avatar_resize_arrayBuffer = await sharp(avatar_arrayBuffer).resize(64, 64).toBuffer();
-              message_content = `${quoted_message_id === null ? "" : h.quote(quoted_message_id)}${h.image(avatar_resize_arrayBuffer, avatar_type)}[Discord] ${nickname}:\n${message}`;
+              message_content = `${quoted_message_id === null ? "" : h.quote(quoted_message_id)}${config.show_discord_avatar ? h.image(avatar_resize_arrayBuffer, avatar_type) : ""}[Discord] ${nickname}:\n${message}`;
             }
 
             let retry_count = 0;
@@ -288,7 +290,7 @@ const main = async (ctx: Context, config: Config, session: Session) => {
                 const to_guild_id = await ctx.database.get("channel", {
                   id: to.channel_id
                 });
-                // 消息发送成功后才记录
+                // Record the message mapping in the database after the message is sent successfully
                 try {
                   await ctx.database.create("bridge_message", {
                     timestamp: BigInt(Date.now()),
@@ -350,4 +352,8 @@ export function apply(ctx: Context, config: Config) {
   })
 
   ctx.on("message", async (session) => await main(ctx, config, session));
+
+  // for Discord
+  ctx.on("discord/message-update", async (session) => await onDiscordMessageUpdated(ctx, config, session));
+  ctx.on("discord/message-delete", async (session) => await onDiscordMessageDeleted(ctx, config, session));
 }

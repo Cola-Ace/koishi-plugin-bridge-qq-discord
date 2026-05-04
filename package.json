@@ -13,7 +13,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Cola-Ace/koishi-plugin-bridge-discord-qq.git"
+    "url": "git+https://github.com/Cola-Ace/koishi-plugin-bridge-qq-discord.git"
   },
   "keywords": [
     "chatbot",

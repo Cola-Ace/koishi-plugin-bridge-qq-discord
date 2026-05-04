@@ -1,0 +1,51 @@
+name: Bug 反馈
+description: 报告插件运行中出现的异常行为
+title: "[BUG] "
+labels: bug
+assignees: "Cola-Ace"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        在提交新的 Bug 反馈前，请确保您：
+        * 已经搜索了现有的 issues，并且没有找到可以解决您问题的方法
+        * 不与现有的某一 issue 重复
+  - type: input
+    id: onebot-type
+    attributes:
+      label: 使用的 OneBot 客户端
+      description: 提供 OneBot 客户端的类型
+      placeholder: NapCat 4.8.93
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么?
+      description: 填写你认为的的异常行为
+    validations:
+      required: true
+  - type: textarea
+    id: how-reproduce
+    attributes:
+      label: 如何复现
+      description: 填写应当如何操作才能触发这个异常行为
+      placeholder: |
+        1. xxx
+        2. xxx
+        3. xxx
+    validations:
+      required: true
+  - type: textarea
+    id: what-expected
+    attributes:
+      label: 期望的结果?
+      description: 填写你认为插件应当执行的正常行为
+    validations:
+      required: true
+  - type: textarea
+    id: plugin-debug-log
+    attributes:
+      label: 插件运行日志
+      description: 粘贴相关日志内容到此处（注意删去隐私信息）
+      render: shell

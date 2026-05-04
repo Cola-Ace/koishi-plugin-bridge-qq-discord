@@ -1,6 +1,6 @@
-# koishi-plugin-bridge-discord-qq
+# koishi-plugin-bridge-qq-discord
 [![npm](https://img.shields.io/npm/v/koishi-plugin-bridge-qq-discord)](https://www.npmjs.com/package/koishi-plugin-bridge-qq-discord)
-[![LICENSE](https://img.shields.io/github/license/Cola-Ace/koishi-plugin-bridge-discord-qq)](https://github.com/Cola-Ace/koishi-plugin-bridge-discord-qq/blob/main/LICENSE)
+[![LICENSE](https://img.shields.io/github/license/Cola-Ace/koishi-plugin-bridge-qq-discord)](https://github.com/Cola-Ace/koishi-plugin-bridge-qq-discord/blob/main/LICENSE)
 ![NPM Downloads](https://img.shields.io/npm/d18m/koishi-plugin-bridge-qq-discord)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Cola-Ace/koishi-plugin-bridge-discord-qq/publish.yml)
 

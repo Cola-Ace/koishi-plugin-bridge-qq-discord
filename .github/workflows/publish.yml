@@ -8,6 +8,10 @@ on:
     paths:
       - 'package.json'
 
+permissions:
+  id-token: write   # 必需：用于 OIDC 与 npm 信任发布
+  contents: write   # 需要写权限以创建 release（如使用 release-action）
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
@@ -15,24 +19,29 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
+
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
-          node-version: '20.x'
-          registry-url: 'https://registry.npmjs.org'
+        node-version: '24'
+        registry-url: 'https://registry.npmjs.org'
+
     - name: Install Dependencies
       run: yarn
+
     - name: TSC
       run: yarn tsc
+
     - name: Build Project
       run: yarn build
+
     - name: Get Version from package.json
       id: get_version
       run: echo "PACKAGE_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
-    - name: Publish to npm
+
+    - name: Publish to npm (Trusted Publishing)
       run: npm publish
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
     - name: Create Release
       uses: ncipollo/release-action@v1
       with:

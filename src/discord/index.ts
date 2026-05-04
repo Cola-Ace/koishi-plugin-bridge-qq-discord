@@ -22,7 +22,7 @@ export default class ProcessorDiscord {
 		for (const element of elements.length === 0 ? message_data.quote.elements : elements) {
 			switch (element.type) {
 				case "text": {
-					if (Blacklist.check(element.attrs.content)) return; // 黑名单检测
+					if (Blacklist.check(element.attrs.content)) return ""; // 黑名单检测
 
 					message += element.attrs.content;
 
@@ -49,14 +49,14 @@ export default class ProcessorDiscord {
 				}
 
 				case "https:": {
-					message += `https:${Object.keys(element.attrs)[0]}`;
+					message += `https:${Object.keys(element.attrs).join("=")}`;
 
 					break;
 				}
 
 				case "img": {
 					if (config.file_processor === "Koishi") {
-						const [img_blob, img_type, img_error] = await getBinary(element.attrs.src, ctx.http);
+						const [img_blob, _, img_error] = await getBinary(element.attrs.src, ctx.http);
 						if (img_error) {
 							logger.error(img_error);
 							break;
@@ -75,7 +75,7 @@ export default class ProcessorDiscord {
           const url = `${src}${src.indexOf("?quality=lossless") !== -1 ? "&size=44" : ""}`
 
           if (config.file_processor === "Koishi") {
-						const [img_blob, img_type, img_error] = await getBinary(url, ctx.http);
+						const [img_blob, _, img_error] = await getBinary(url, ctx.http);
 						if (img_error) {
 							logger.error(img_error);
 							break;
@@ -118,7 +118,7 @@ export default class ProcessorDiscord {
 					}
 
 					if (config.file_processor === "Koishi") {
-						const [video_blob, video_type, video_error] = await getBinary(element.attrs.src, ctx.http);
+						const [video_blob, _, video_error] = await getBinary(element.attrs.src, ctx.http);
 						if (video_error) {
 							logger.error(video_error);
 							break;

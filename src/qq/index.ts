@@ -28,7 +28,6 @@ export default class ProcessorQQ {
 						message_body.text += "@everyone";
 						message_body.validElement = true;
             message_body.mentionEveryone = true;
-						// return [false, ""];
             break;
 					}
 

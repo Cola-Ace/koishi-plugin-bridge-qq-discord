@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-bridge-qq-discord",
   "description": "自用插件，如需进一步了解请联系我（联系方式见 Github）",
-  "version": "1.8.5",
+  "version": "1.9.0",
   "contributors": [
     "Xc_ace <xca259@gmail.com>"
   ],

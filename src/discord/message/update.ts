@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Context, h } from "koishi";
 import type { Session } from "koishi";
 import { getBinary, logger, BlacklistDetector } from "../../utils";

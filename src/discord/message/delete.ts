@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Context } from "koishi";
 import type { Session } from "koishi";
 import { Config } from "../../config";

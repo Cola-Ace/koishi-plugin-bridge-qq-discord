@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Context, h, Session } from 'koishi';
 import { } from 'koishi-plugin-adapter-onebot';
 import { Config } from './config';

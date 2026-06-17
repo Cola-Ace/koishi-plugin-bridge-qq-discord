@@ -1,9 +1,9 @@
 // @ts-nocheck
-import { Context, h } from "koishi";
+import { Context } from "koishi";
 import type { Session } from "koishi";
-import { getBinary, logger, BlacklistDetector } from "../../utils";
+import { createDiscordAvatarElement, findDiscordToQQBot, getDiscordAvatarUrl, sendQQMessageWithRetry } from "../../bridge";
+import { logger, BlacklistDetector } from "../../utils";
 import { Config } from "../../config";
-import sharp from "sharp";
 
 export default async function onDiscordMessageUpdated(ctx: Context, config: Config, session: Session) {
 	if (!config.sync_edit_delete) return;
@@ -28,22 +28,9 @@ export default async function onDiscordMessageUpdated(ctx: Context, config: Conf
 
 	// If not found, maybe it's a message that was sent before the bot was added to the channel,
 	// or the message was not bridged for some reason (for example have words in the blacklist). In this case, we can just ignore the update.
-	if (!bridgeMessage) return;
+	if (bridgeMessage.length === 0) return;
 
-	let qqbot = null;
-	for (const constant of config.constant || []) {
-		if (
-			constant.enable &&
-			constant.from[0].platform === "discord" &&
-			constant.from[0].channel_id === channelId &&
-			constant.to[0].platform === "onebot" &&
-			constant.to[0].channel_id === bridgeMessage[0].to_channel_id
-		) {
-			qqbot = ctx.bots[`${constant.to[0].platform}:${constant.to[0].self_id}`];
-			break;
-		}
-	}
-
+	const qqbot = findDiscordToQQBot(ctx, config, channelId, bridgeMessage[0].to_channel_id);
 	if (!qqbot) return;
 
 	// Delete message
@@ -58,56 +45,28 @@ export default async function onDiscordMessageUpdated(ctx: Context, config: Conf
 	// Init nickname
 	const nickname = session.member.nick === null ? session.author.global_name : session.member.nick;
 
-	// Process Discord default avatar
-	let avatar_color = "";
-	let avatar = `https://cdn.discordapp.com/avatars/${session.author.id}/${session.author.avatar ?? ""}.png?size=64`;
-	if (session.author.avatar === null) {
-		avatar_color = config.discord_default_avatar_color.toString();
-		if (config.discord_default_avatar_color === 99) {
-			avatar_color = Math.floor(Math.random() * 5).toString();
-		}
-		avatar = `https://cdn.discordapp.com/embed/avatars/${avatar_color}.png`;
-	}
-
-	let message_content = `${config.show_discord_avatar ? h.image(avatar) : ""}[Discord] ${nickname}:\n===== 该条消息为 Discord 编辑后消息 =====\n${content}`;
-	if (config.file_processor === "Koishi") {
-		const [avatar_blob, avatar_type, avatar_error] = await getBinary(avatar, ctx.http);
-		if (avatar_error) {
-			logger.error(avatar_error);
-			return;
-		}
-		const avatar_arrayBuffer = await avatar_blob.arrayBuffer();
-		const avatar_resize_arrayBuffer = await sharp(avatar_arrayBuffer).resize(64, 64).toBuffer();
-		message_content = `${config.show_discord_avatar ? h.image(avatar_resize_arrayBuffer, avatar_type) : ""}[Discord] ${nickname}:\n===== 该条消息为 Discord 编辑后消息 =====\n${content}`;
-	}
+	const avatar = getDiscordAvatarUrl(
+		config,
+		session.author.avatar,
+		`https://cdn.discordapp.com/avatars/${session.author.id}/${session.author.avatar ?? ""}.png?size=64`,
+	);
+	const avatarElement = await createDiscordAvatarElement(ctx, config, avatar);
+	if (avatarElement === null) return;
 
 	// Send Message
-	let retry_count = 0;
-	while (retry_count <= 3) {
-		try {
-			const newMessageId = await qqbot.sendMessage(bridgeMessage[0].to_channel_id, message_content);
-			// Record the message mapping in the database after the message is sent successfully
-			try {
-				await ctx.database.set("bridge_message", {
-          from_message_id: bridgeMessage[0].from_message_id,
-        }, {
-          to_message_id: newMessageId[0],
-          onebot_real_message_id: newMessageId[0],
-        })
-			} catch (error) {
-				logger.error(error);
-			}
+	const messageContent = `${avatarElement}[Discord] ${nickname}:\n===== 该条消息为 Discord 编辑后消息 =====\n${content}`;
+	const newMessageId = await sendQQMessageWithRetry(qqbot, bridgeMessage[0].to_channel_id, messageContent);
+	if (newMessageId === null) return;
 
-			break;
-		} catch (error) {
-			retry_count++;
-			if (retry_count >= 3) {
-				logger.error(error);
-				break;
-			}
-
-			logger.info(`发送消息失败，正在重试... (${retry_count}/3)`);
-			await new Promise((resolve) => setTimeout(resolve, 1000));
-		}
+	// Record the message mapping in the database after the message is sent successfully
+	try {
+		await ctx.database.set("bridge_message", {
+			from_message_id: bridgeMessage[0].from_message_id,
+		}, {
+			to_message_id: newMessageId[0],
+			onebot_real_message_id: newMessageId[0],
+		});
+	} catch (error) {
+		logger.error(error);
 	}
 }

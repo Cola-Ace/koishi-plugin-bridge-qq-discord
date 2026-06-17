@@ -46,18 +46,23 @@ export async function createBridgeMessageRecord(ctx: Context, record: BridgeMess
     id: record.toChannelId,
   });
 
+  const fromGuildId = fromGuild[0]?.guildId ?? "";
+  const toGuildId = toGuild[0]?.guildId ?? "";
+  if (!fromGuild[0]) logger.warn(`Failed to find guild for channel ${record.fromChannelId}`);
+  if (!toGuild[0]) logger.warn(`Failed to find guild for channel ${record.toChannelId}`);
+
   await ctx.database.create("bridge_message", {
     timestamp: BigInt(Date.now()),
     from_message_id: record.fromMessageId,
     from_platform: record.fromPlatform,
     from_channel_id: record.fromChannelId,
-    from_guild_id: fromGuild[0]["guildId"],
+    from_guild_id: fromGuildId,
     from_sender_id: record.fromSenderId,
     from_sender_name: record.fromSenderName,
     to_message_id: record.toMessageId,
     to_platform: record.toPlatform,
     to_channel_id: record.toChannelId,
-    to_guild_id: toGuild[0]["guildId"],
+    to_guild_id: toGuildId,
     onebot_real_message_id: record.onebotRealMessageId,
   });
 }

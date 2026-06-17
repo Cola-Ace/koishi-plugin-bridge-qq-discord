@@ -170,17 +170,21 @@ async function handleQQToDiscord(
     const res = await ctx.http.post(`${webhookUrl}?wait=true`, messageBody.form);
 
     // 消息发送成功后才记录
-    await createBridgeMessageRecord(ctx, {
-      fromMessageId: messageData.id,
-      fromPlatform: platform,
-      fromChannelId: channelId,
-      fromSenderId: sender.id,
-      fromSenderName: nickname,
-      toMessageId: res.id,
-      toPlatform: "discord",
-      toChannelId: to.channel_id,
-      onebotRealMessageId: messageData.id,
-    });
+    try {
+      await createBridgeMessageRecord(ctx, {
+        fromMessageId: messageData.id,
+        fromPlatform: platform,
+        fromChannelId: channelId,
+        fromSenderId: sender.id,
+        fromSenderName: nickname,
+        toMessageId: res.id,
+        toPlatform: "discord",
+        toChannelId: to.channel_id,
+        onebotRealMessageId: messageData.id,
+      });
+    } catch (error) {
+      logger.error(error);
+    }
   } catch (error) {
     logger.error(error);
 

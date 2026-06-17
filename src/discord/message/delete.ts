@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { Context } from "koishi";
 import type { Session } from "koishi";
+import { findDiscordToQQBot } from "../../bridge";
 import { Config } from "../../config";
 
 export default async function onDiscordMessageDeleted(ctx: Context, config: Config, session: Session) {
@@ -18,22 +19,9 @@ export default async function onDiscordMessageDeleted(ctx: Context, config: Conf
 
   // If not found, maybe it's a message that was sent before the bot was added to the channel,
   // or the message was not bridged for some reason (for example have words in the blacklist). In this case, we can just ignore the deletion.
-  if (!bridgeMessage) return;
+  if (bridgeMessage.length === 0) return;
 
-  let qqbot = null;
-  for (const constant of config.constant || []) {
-    if (
-      constant.enable &&
-      constant.from[0].platform === "discord" &&
-      constant.from[0].channel_id === channelId &&
-      constant.to[0].platform === "onebot" &&
-      constant.to[0].channel_id === bridgeMessage[0].to_channel_id
-    ) {
-      qqbot = ctx.bots[`${constant.to[0].platform}:${constant.to[0].self_id}`];
-      break;
-    }
-  }
-
+  const qqbot = findDiscordToQQBot(ctx, config, channelId, bridgeMessage[0].to_channel_id);
   if (!qqbot) return;
 
   // Delete message

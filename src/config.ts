@@ -19,6 +19,7 @@ export interface Config {
   file_processor: "Koishi" | "QQBot",
   show_discord_avatar: boolean,
   sync_edit_delete: boolean,
+  show_discord_channel_name: boolean,
   discord_default_avatar_color: 99 | 0 | 1 | 2 | 3 | 4,
   download_threads: number,
   qq_file_limit: number,
@@ -59,6 +60,7 @@ export const Config: Schema<Config> = Schema.object({
 
   show_discord_avatar: Schema.boolean().description("显示 Discord 头像").default(true),
   sync_edit_delete: Schema.boolean().description("同步消息的编辑和删除").default(false),
+  show_discord_channel_name: Schema.boolean().description("转发消息到 QQ 时显示 Discord 的频道名称").default(false),
 
   discord_default_avatar_color: Schema.union([
     Schema.const(99).description("随机颜色"),

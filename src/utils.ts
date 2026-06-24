@@ -1,5 +1,6 @@
-import { Logger, HTTP } from 'koishi';
-import { MessageBody } from './types';
+import { Buffer } from "buffer";
+import { Logger, HTTP } from "koishi";
+import { MessageBody } from "./types";
 
 export const logger = new Logger("bridge");
 export function convertMsTimestampToISO8601(msTimestamp: number): string {
@@ -21,6 +22,10 @@ export function generateMessageBody(): MessageBody {
     hasFile: false,
     mentionEveryone: false
   };
+}
+
+export function toDataUrl(data: ArrayBuffer | Uint8Array, type?: string | null): string {
+  return `data:${type ?? ""};base64,${Buffer.from(data).toString("base64")}`;
 }
 
 export function getDate() {

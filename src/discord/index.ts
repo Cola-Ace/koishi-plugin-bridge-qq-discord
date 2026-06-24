@@ -1,6 +1,6 @@
 import { Bot, Context, h } from "koishi";
 import type { Session } from "koishi";
-import { getBinary, logger, BlacklistDetector } from "../utils";
+import { getBinary, logger, BlacklistDetector, toDataUrl } from "../utils";
 import { Config, BasicType } from "../config";
 
 import { URL } from "url";
@@ -56,13 +56,13 @@ export default class ProcessorDiscord {
 
 				case "img": {
 					if (config.file_processor === "Koishi") {
-						const [img_blob, _, img_error] = await getBinary(element.attrs.src, ctx.http);
+						const [img_blob, img_type, img_error] = await getBinary(element.attrs.src, ctx.http);
 						if (img_error) {
 							logger.error(img_error);
 							break;
 						}
 						const img_arrayBuffer = await img_blob.arrayBuffer();
-						message += h.image(img_arrayBuffer, element.attrs.type);
+						message += h.image(toDataUrl(img_arrayBuffer, img_type));
 					} else {
 						message += h.image(element.attrs.src);
 					}
@@ -75,13 +75,13 @@ export default class ProcessorDiscord {
           const url = `${src}${src.indexOf("?quality=lossless") !== -1 ? "&size=44" : ""}`
 
           if (config.file_processor === "Koishi") {
-						const [img_blob, _, img_error] = await getBinary(url, ctx.http);
+						const [img_blob, img_type, img_error] = await getBinary(url, ctx.http);
 						if (img_error) {
 							logger.error(img_error);
 							break;
 						}
 						const img_arrayBuffer = await img_blob.arrayBuffer();
-						message += h.image(img_arrayBuffer, element.attrs.type);
+						message += h.image(toDataUrl(img_arrayBuffer, img_type));
 					} else {
 						message += h.image(url);
 					}
@@ -118,13 +118,13 @@ export default class ProcessorDiscord {
 					}
 
 					if (config.file_processor === "Koishi") {
-						const [video_blob, _, video_error] = await getBinary(element.attrs.src, ctx.http);
+						const [video_blob, video_type, video_error] = await getBinary(element.attrs.src, ctx.http);
 						if (video_error) {
 							logger.error(video_error);
 							break;
 						}
 						const video_arrayBuffer = await video_blob.arrayBuffer();
-						message += h.video(video_arrayBuffer, element.attrs.type);
+						message += h.video(toDataUrl(video_arrayBuffer, video_type));
 					} else {
 						message += h.video(element.attrs.src);
 					}

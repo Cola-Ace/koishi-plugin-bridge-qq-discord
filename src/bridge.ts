@@ -1,7 +1,7 @@
 import { Bot, Context, h } from "koishi";
 import sharp from "sharp";
 import { BasicType, Config } from "./config";
-import { getBinary, logger } from "./utils";
+import { getBinary, logger, toDataUrl } from "./utils";
 
 export interface BridgeRoute {
   from: BasicType;
@@ -109,7 +109,7 @@ export async function createDiscordAvatarElement(ctx: Context, config: Config, a
   const avatarArrayBuffer = await avatarBlob.arrayBuffer();
   const resizedAvatar = await sharp(avatarArrayBuffer).resize(64, 64).toBuffer();
 
-  return h.image(resizedAvatar, avatarType);
+  return h.image(toDataUrl(resizedAvatar, avatarType));
 }
 
 export function findDiscordToQQBot(ctx: Context, config: Config, fromChannelId: string, toChannelId: string): Bot | null {

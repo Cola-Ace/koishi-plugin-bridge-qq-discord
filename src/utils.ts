@@ -25,7 +25,8 @@ export function generateMessageBody(): MessageBody {
 }
 
 export function toDataUrl(data: ArrayBuffer | Uint8Array, type?: string | null): string {
-  return `data:${type ?? ""};base64,${Buffer.from(data).toString("base64")}`;
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+  return `data:${type ?? ""};base64,${Buffer.from(bytes).toString("base64")}`;
 }
 
 export function getDate() {

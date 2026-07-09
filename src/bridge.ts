@@ -52,6 +52,19 @@ export function isBridgeableDiscordMessage(message): boolean {
   return [0, 19].includes(Number(message.type));
 }
 
+export async function isBridgeableDiscordChannelMessage(ctx: Context, selfId: string, channelId: string, message): Promise<boolean> {
+  if (!isBridgeableDiscordMessage(message)) return false;
+  if (message?.type !== undefined) return true;
+
+  try {
+    const data = await ctx.bots[`discord:${selfId}`].internal.getChannelMessage(channelId, message.id);
+    return isBridgeableDiscordMessage(data);
+  } catch (error) {
+    logger.error(error);
+    return true;
+  }
+}
+
 export async function resolveDiscordRouteChannel(ctx: Context, config: Config, platform: string, selfId: string, channelId: string): Promise<DiscordRouteChannel> {
   if (platform !== "discord") return { routeChannelId: channelId };
 

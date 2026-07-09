@@ -21,7 +21,7 @@ export default async function onDiscordMessageDeleted(ctx: Context, config: Conf
   // or the message was not bridged for some reason (for example have words in the blacklist). In this case, we can just ignore the deletion.
   if (bridgeMessage.length === 0) return;
 
-  const qqbot = findDiscordToQQBot(ctx, config, channelId, bridgeMessage[0].to_channel_id);
+  const qqbot = await findDiscordToQQBot(ctx, config, channelId, bridgeMessage[0].to_channel_id);
   if (!qqbot) return;
 
   // Delete message

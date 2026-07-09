@@ -1,12 +1,13 @@
 // @ts-nocheck
 import { Context } from "koishi";
 import type { Session } from "koishi";
-import { createDiscordAvatarElement, findDiscordToQQBot, getDiscordAvatarUrl, sendQQMessageWithRetry } from "../../bridge";
+import { createDiscordAvatarElement, findDiscordToQQBot, getDiscordAvatarUrl, isBridgeableDiscordMessage, sendQQMessageWithRetry } from "../../bridge";
 import { logger, BlacklistDetector } from "../../utils";
 import { Config } from "../../config";
 
 export default async function onDiscordMessageUpdated(ctx: Context, config: Config, session: Session) {
 	if (!config.sync_edit_delete) return;
+	if (!isBridgeableDiscordMessage(session)) return;
 
 	// TODO: parse new format message
 	const content = session.content;

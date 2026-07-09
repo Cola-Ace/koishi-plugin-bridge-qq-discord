@@ -47,6 +47,11 @@ export function findBridgeRoutes(config: Config, platform: string, selfId: strin
   return routes;
 }
 
+export function isBridgeableDiscordMessage(message): boolean {
+  if (message?.type === undefined) return true;
+  return [0, 19].includes(Number(message.type));
+}
+
 export async function resolveDiscordRouteChannel(ctx: Context, config: Config, platform: string, selfId: string, channelId: string): Promise<DiscordRouteChannel> {
   if (platform !== "discord") return { routeChannelId: channelId };
 

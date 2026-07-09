@@ -5,7 +5,7 @@ import { Config, BasicType } from "./config";
 
 export * from "./config";
 import { MessageBody } from "./types";
-import { createBridgeMessageRecord, createDiscordAvatarElement, findBridgeRoutes, getDiscordAvatarUrl, resolveDiscordRouteChannel, sendQQMessageWithRetry } from "./bridge";
+import { createBridgeMessageRecord, createDiscordAvatarElement, findBridgeRoutes, getDiscordAvatarUrl, isBridgeableDiscordMessage, resolveDiscordRouteChannel, sendQQMessageWithRetry } from "./bridge";
 import { convertMsTimestampToISO8601, logger, BlacklistDetector, generateMessageBody } from "./utils";
 import ProcessorQQ from "./qq";
 import { getWebhook } from "./discord/webhook";
@@ -340,6 +340,7 @@ const main = async (ctx: Context, config: Config, session: Session) => {
 
   // 如果 message_data 不包含 id 字段，则代表该消息为 QQ 文件的占位符消息，直接跳过
   if (!(messageData && "id" in messageData)) return;
+  if (platform === "discord" && !isBridgeableDiscordMessage(messageData)) return;
 
   let nickname = getInitialNickname(session, sender);
   const elements = messageData.elements ?? [];

@@ -1,12 +1,13 @@
 // @ts-nocheck
 import { Context } from "koishi";
 import type { Session } from "koishi";
-import { createDiscordAvatarElement, findDiscordToQQBot, getDiscordAvatarUrl, sendQQMessageWithRetry } from "../../bridge";
+import { createDiscordAvatarElement, findDiscordToQQBot, getDiscordAvatarUrl, isBridgeableDiscordMessage, sendQQMessageWithRetry } from "../../bridge";
 import { logger, BlacklistDetector } from "../../utils";
 import { Config } from "../../config";
 
 export default async function onDiscordMessageUpdated(ctx: Context, config: Config, session: Session) {
 	if (!config.sync_edit_delete) return;
+	if (!isBridgeableDiscordMessage(session)) return;
 
 	// TODO: parse new format message
 	const content = session.content;
@@ -30,7 +31,7 @@ export default async function onDiscordMessageUpdated(ctx: Context, config: Conf
 	// or the message was not bridged for some reason (for example have words in the blacklist). In this case, we can just ignore the update.
 	if (bridgeMessage.length === 0) return;
 
-	const qqbot = findDiscordToQQBot(ctx, config, channelId, bridgeMessage[0].to_channel_id);
+	const qqbot = await findDiscordToQQBot(ctx, config, channelId, bridgeMessage[0].to_channel_id);
 	if (!qqbot) return;
 
 	// Delete message

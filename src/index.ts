@@ -5,7 +5,7 @@ import { Config, BasicType } from "./config";
 
 export * from "./config";
 import { MessageBody } from "./types";
-import { createBridgeMessageRecord, createDiscordAvatarElement, findBridgeRoutes, getDiscordAvatarUrl, sendQQMessageWithRetry } from "./bridge";
+import { createBridgeMessageRecord, createDiscordAvatarElement, findBridgeRoutes, getDiscordAvatarUrl, isBridgeableDiscordChannelMessage, resolveDiscordRouteChannel, sendQQMessageWithRetry } from "./bridge";
 import { convertMsTimestampToISO8601, logger, BlacklistDetector, generateMessageBody } from "./utils";
 import ProcessorQQ from "./qq";
 import { getWebhook } from "./discord/webhook";
@@ -254,6 +254,7 @@ async function handleDiscordToQQ(
   nickname: string,
   platform: string,
   channelId: string,
+  thread,
   blacklist: BlacklistDetector,
 ) {
   const qqbot = ctx.bots[`${to.platform}:${to.self_id}`];
@@ -286,7 +287,11 @@ async function handleDiscordToQQ(
   }
 
   let prefix = "[Discord]";
-  if (config.show_discord_channel_name && channelInfo !== null) {
+  if (thread) {
+    prefix = config.show_discord_channel_name && thread.parentName
+      ? `[Discord from ${thread.parentName} -> thread ${thread.name}]`
+      : `[Discord from thread ${thread.name}]`;
+  } else if (config.show_discord_channel_name && channelInfo !== null) {
     prefix = `[Discord from ${channelInfo.name ?? ""}]`;
   }
 
@@ -335,17 +340,20 @@ const main = async (ctx: Context, config: Config, session: Session) => {
 
   // 如果 message_data 不包含 id 字段，则代表该消息为 QQ 文件的占位符消息，直接跳过
   if (!(messageData && "id" in messageData)) return;
+  if (platform === "discord" && !await isBridgeableDiscordChannelMessage(ctx, selfId, channelId, messageData)) return;
 
   let nickname = getInitialNickname(session, sender);
   const elements = messageData.elements ?? [];
 
   if (elements.length <= 0 && !Object.keys(messageData).includes("quote")) return;
 
-  for (const { from, to } of findBridgeRoutes(config, platform, selfId, channelId)) {
+  const routeChannel = await resolveDiscordRouteChannel(ctx, config, platform, selfId, channelId);
+
+  for (const { from, to } of findBridgeRoutes(config, platform, selfId, routeChannel.routeChannelId)) {
     try {
       const shouldContinue = to.platform === "discord"
         ? await handleQQToDiscord(ctx, config, session, from, to, messageData, elements, sender, nickname, platform, channelId, selfId, blacklist)
-        : await handleDiscordToQQ(ctx, config, session, from, to, messageData, elements, sender, nickname, platform, channelId, blacklist);
+        : await handleDiscordToQQ(ctx, config, session, from, to, messageData, elements, sender, nickname, platform, channelId, routeChannel.thread, blacklist);
 
       if (!shouldContinue) return;
     } catch (error) {

@@ -20,6 +20,15 @@ export interface BridgeMessageRecord {
   onebotRealMessageId: string;
 }
 
+export interface DiscordRouteChannel {
+  routeChannelId: string;
+  thread?: {
+    id: string;
+    name: string;
+    parentName?: string;
+  };
+}
+
 export function findBridgeRoutes(config: Config, platform: string, selfId: string, channelId: string): BridgeRoute[] {
   const routes: BridgeRoute[] = [];
 
@@ -36,6 +45,63 @@ export function findBridgeRoutes(config: Config, platform: string, selfId: strin
   }
 
   return routes;
+}
+
+export function isBridgeableDiscordMessage(message): boolean {
+  if (message?.type === undefined) return true;
+  return [0, 19].includes(Number(message.type));
+}
+
+export async function isBridgeableDiscordChannelMessage(ctx: Context, selfId: string, channelId: string, message): Promise<boolean> {
+  if (!isBridgeableDiscordMessage(message)) return false;
+  if (message?.type !== undefined) return true;
+
+  try {
+    const data = await ctx.bots[`discord:${selfId}`].internal.getChannelMessage(channelId, message.id);
+    return isBridgeableDiscordMessage(data);
+  } catch (error) {
+    logger.error(error);
+    return true;
+  }
+}
+
+export async function resolveDiscordRouteChannel(ctx: Context, config: Config, platform: string, selfId: string, channelId: string): Promise<DiscordRouteChannel> {
+  if (platform !== "discord") return { routeChannelId: channelId };
+
+  const dcBot = ctx.bots[`discord:${selfId}`];
+  let channel;
+  try {
+    channel = await dcBot.internal.getChannel(channelId);
+  } catch (error) {
+    logger.error(error);
+    return { routeChannelId: channelId };
+  }
+  const channelType = Number(channel.type);
+  if (channelType === 12) return { routeChannelId: "" };
+  if (findBridgeRoutes(config, platform, selfId, channelId).length > 0) return { routeChannelId: channelId };
+  if (![10, 11].includes(channelType) || !channel.parent_id) return { routeChannelId: channelId };
+
+  const routes = findBridgeRoutes(config, platform, selfId, channel.parent_id);
+  if (routes.length === 0) return { routeChannelId: channelId };
+
+  let parentName: string | undefined;
+  if (config.show_discord_channel_name) {
+    try {
+      const parent = await dcBot.internal.getChannel(channel.parent_id);
+      parentName = parent.name ?? channel.parent_id;
+    } catch (error) {
+      logger.error(error);
+    }
+  }
+
+  return {
+    routeChannelId: channel.parent_id,
+    thread: {
+      id: channelId,
+      name: channel.name ?? channelId,
+      parentName,
+    },
+  };
 }
 
 export async function createBridgeMessageRecord(ctx: Context, record: BridgeMessageRecord) {
@@ -112,16 +178,29 @@ export async function createDiscordAvatarElement(ctx: Context, config: Config, a
   return h.image(toDataUrl(resizedAvatar, avatarType));
 }
 
-export function findDiscordToQQBot(ctx: Context, config: Config, fromChannelId: string, toChannelId: string): Bot | null {
+export async function findDiscordToQQBot(ctx: Context, config: Config, fromChannelId: string, toChannelId: string): Promise<Bot | null> {
   for (const constant of config.constant ?? []) {
     if (!constant.enable) continue;
 
     for (const from of constant.from) {
-      if (from.platform !== "discord" || from.channel_id !== fromChannelId) continue;
+      if (from.platform !== "discord") continue;
 
       for (const to of constant.to) {
         if (to.platform === "onebot" && to.channel_id === toChannelId) {
-          return ctx.bots[`${to.platform}:${to.self_id}`];
+          const dcBot = ctx.bots[`discord:${from.self_id}`];
+          let channel;
+          try {
+            channel = await dcBot.internal.getChannel(fromChannelId);
+          } catch (error) {
+            logger.error(error);
+            continue;
+          }
+          const channelType = Number(channel.type);
+          if (channelType === 12) continue;
+          if (from.channel_id === fromChannelId) return ctx.bots[`${to.platform}:${to.self_id}`];
+          if ([10, 11].includes(channelType) && channel.parent_id === from.channel_id) {
+            return ctx.bots[`${to.platform}:${to.self_id}`];
+          }
         }
       }
     }

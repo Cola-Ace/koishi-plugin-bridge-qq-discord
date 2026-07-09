@@ -2,4 +2,6 @@
 - None
 
 ### 🐞 Bug Fixes
-- [Discord -> QQ] 使用 `data:` URL 转发 Koishi 处理的图片、表情、视频和头像，避免 `base64:` 协议弃用提示
+- [Discord -> QQ] 支持 Discord thread 消息按父频道配置转发，并在 QQ 消息中标记来源 thread
+- [Discord -> QQ] 不再转发 private thread 消息
+- [Discord -> QQ] 过滤 Discord 创建、删除子区等系统消息，避免把子区名称转发到 QQ

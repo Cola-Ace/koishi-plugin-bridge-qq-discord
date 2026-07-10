@@ -1,12 +1,13 @@
 name: Publish
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
-    paths:
-      - 'package.json'
+    tags:
+      - "v*"
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
 
 permissions:
   id-token: write   # 必需：用于 OIDC 与 npm 信任发布
@@ -18,10 +19,10 @@ jobs:
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Setup Node
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: '24'
         registry-url: 'https://registry.npmjs.org'
@@ -35,12 +36,23 @@ jobs:
     - name: Build Project
       run: yarn build
 
-    - name: Get Version from package.json
-      id: get_version
-      run: echo "PACKAGE_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
+    - name: Verify Version
+      run: |
+        PACKAGE_VERSION=$(node -p "require('./package.json').version")
+        if [ "$GITHUB_REF_NAME" != "v$PACKAGE_VERSION" ]; then
+          echo "::error::Tag $GITHUB_REF_NAME does not match package version $PACKAGE_VERSION"
+          exit 1
+        fi
+        echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
 
     - name: Publish to npm (Trusted Publishing)
-      run: npm publish
+      run: |
+        PACKAGE_NAME=$(node -p "require('./package.json').name")
+        if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version > /dev/null 2>&1; then
+          echo "$PACKAGE_NAME@$PACKAGE_VERSION is already published"
+        else
+          npm publish
+        fi
 
     - name: Create Release
       uses: ncipollo/release-action@v1
@@ -48,4 +60,4 @@ jobs:
         bodyFile: "CHANGELOG.md"
         tag: v${{ env.PACKAGE_VERSION }}
         name: v${{ env.PACKAGE_VERSION }}
-        token: ${{ secrets.PUB_GITHUB_TOKEN }}
+        allowUpdates: true

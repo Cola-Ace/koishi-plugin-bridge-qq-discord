@@ -1,3 +1,5 @@
+
+
 # koishi-plugin-bridge-qq-discord
 [![npm](https://img.shields.io/npm/v/koishi-plugin-bridge-qq-discord)](https://www.npmjs.com/package/koishi-plugin-bridge-qq-discord)
 [![LICENSE](https://img.shields.io/github/license/Cola-Ace/koishi-plugin-bridge-qq-discord)](https://github.com/Cola-Ace/koishi-plugin-bridge-qq-discord/blob/main/LICENSE)
@@ -52,3 +54,4 @@
     - [x] 表情同步
     - [x] 文件同步
     - [x] 视频同步
+    - [x] Thread 消息同步

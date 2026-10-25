@@ -3,6 +3,8 @@ import { getBinary, logger, getDate, BlacklistDetector, generateMessageBody } fr
 import { Config, BasicType } from "../config";
 import { MessageBody } from "../types";
 import { v4 as uuidv4 } from "uuid";
+import { CQCode, OneBot } from "koishi-plugin-adapter-onebot";
+import { getWebhook } from "../discord/webhook";
 
 // return stop = false 相当于 break
 
@@ -55,10 +57,15 @@ export default class ProcessorQQ {
 
 					break;
 				}
-				case "forward": {
-					await this.forward(Blacklist, to.channel_id, element.attrs.content, dc_bot, [from, to], ctx);
-					return [true, "done"];
-				}
+        case "forward": {
+          // 适配器声明的 ForwardMessage 使用 content，实际响应为带 message 的消息对象。
+          const contents = await session.onebot.getForwardMsg(element.attrs.id) as unknown as OneBot.Message[];
+          if (!Array.isArray(contents)) {
+            throw new Error("OneBot get_forward_msg 未返回有效的消息数组");
+          }
+          await this.forward(Blacklist, to.channel_id, contents, dc_bot, [from, to], ctx);
+          return [true, "done"];
+        }
 				case "img": {
 					const [stop, reason] = await this.image(element.attrs.src, message_body, http);
 					if (stop) return [true, reason];
@@ -149,94 +156,64 @@ export default class ProcessorQQ {
 		return [false, ""];
 	}
 
-	static async forward(blacklist: BlacklistDetector, channel_id: string, contents: Array<object>, dc_bot: Bot, [from, to]: [BasicType, BasicType], ctx: Context): Promise<void> {
-		const thread = await dc_bot.internal.startThreadWithoutMessage(channel_id, { name: `转发消息 ${getDate()}`, type: 11 });
-		await dc_bot.internal.modifyChannel(thread.id, { locked: true });
+  static async forward(blacklist: BlacklistDetector, channel_id: string, contents: OneBot.Message[], dc_bot: Bot, [, to]: [BasicType, BasicType], ctx: Context): Promise<void> {
+    const thread = await dc_bot.internal.startThreadWithoutMessage(channel_id, { name: `转发消息 ${getDate()}`, type: 11 });
+    await dc_bot.internal.modifyChannel(thread.id, { locked: true });
+    let webhook: [string, string, boolean];
 
-		for (const content of contents) {
-			// 单条消息
-			const message_body: MessageBody = generateMessageBody();
-			let bridge_message = false;
-			let avatar = "";
-			let nickname = "";
-			if (content["sender"]["user_id"] === from.self_id) bridge_message = true;
+    try {
+      messages: for (const content of contents) {
+        const sender = content.sender;
+        const elements = CQCode.parse(content.message);
+        const message_body = generateMessageBody();
 
-			for (const element of content["message"]) {
-				switch (element.type) {
-					// face 和 mface 在转发消息中都为表情名称 (text)
-					case "forward": {
-						message_body.text += "【检测到嵌套合并转发消息，请前往 QQ 查看】";
-						message_body.validElement = true;
+        for (const element of elements) {
+          switch (element.type) {
+            case "forward": {
+              message_body.text += "【检测到嵌套合并转发消息，请前往 QQ 查看】";
+              message_body.validElement = true;
+              break;
+            }
+            case "image": {
+              await this.image(element.attrs.url || element.attrs.file, message_body, ctx.http);
+              break;
+            }
+            case "json": {
+              this.json(element.attrs.data, message_body);
+              break;
+            }
+            case "text": {
+              const [stop] = this.text(blacklist, element.attrs.content, message_body);
+              if (stop) continue messages;
+              break;
+            }
+          }
+        }
 
-						break;
-					}
-					case "image": {
-						if (bridge_message && avatar === "") {
-							avatar = element["data"]["url"];
+        if (!message_body.validElement) continue;
+        webhook ??= await getWebhook(dc_bot, to.self_id, channel_id);
+        const [webhook_url] = webhook;
+        const payload_json = JSON.stringify({
+          content: message_body.text,
+          username: `[QQ:${sender.user_id}] ${sender.nickname}`,
+          avatar_url: `https://q.qlogo.cn/headimg_dl?dst_uin=${sender.user_id}&spec=640`,
+          embeds: message_body.embed,
+          allowed_mentions: { parse: [] },
+        });
+        message_body.form.append("payload_json", payload_json);
 
-							break;
-						}
-						await this.image(element["data"]["url"], message_body, ctx.http);
-
-						break;
-					}
-					case "json": {
-						this.json(element["data"]["data"], message_body);
-
-						break;
-					}
-					case "text": {
-						this.text(blacklist, element["data"]["text"], message_body);
-
-						break;
-					}
-					default: {
-						break;
-					}
-				}
-			}
-
-			if (!message_body.validElement) continue;
-
-			// 实现发送消息功能
-			let webhook_url = "";
-			let webhook_id = "";
-			let has_webhook = false;
-			const webhooks_list = await dc_bot.internal.getChannelWebhooks(channel_id);
-
-			for (const webhook of webhooks_list) {
-				if (webhook["user"]["id"] === to.self_id && "url" in webhook) {
-					webhook_url = webhook["url"];
-					webhook_id = webhook["id"];
-					has_webhook = true;
-				}
-			}
-
-			if (!has_webhook) {
-				const webhook = await dc_bot.internal.createWebhook(channel_id, { name: "Bridge" });
-				webhook_url = webhook["url"];
-				webhook_id = webhook["id"];
-			}
-
-			const payload_json = JSON.stringify({
-				content: message_body.text,
-				username: nickname === "" ? `[QQ:${content["sender"]["user_id"]}] ${content["sender"]["nickname"]}` : nickname,
-				avatar_url: avatar === "" ? `https://q.qlogo.cn/headimg_dl?dst_uin=${content["sender"]["user_id"]}&spec=640` : avatar,
-				embeds: message_body.embed,
-			});
-			message_body.form.append("payload_json", payload_json);
-
-			try {
-				await ctx.http.post(`${webhook_url}?wait=true&thread_id=${thread.id}`, message_body.form);
-			} catch (error) {
-				logger.error(error);
-			}
-
-			if (!has_webhook) {
-				await dc_bot.internal.deleteWebhook(webhook_id);
-			}
-		}
-	}
+        try {
+          await ctx.http.post(`${webhook_url}?wait=true&thread_id=${thread.id}`, message_body.form);
+        } catch (error) {
+          logger.error(error);
+        }
+      }
+    } finally {
+      if (webhook && !webhook[2]) {
+        await dc_bot.internal.deleteWebhook(webhook[1]);
+      }
+    }
+  }
 
 	static async image(url: string, message_body: MessageBody, http: HTTP): Promise<[boolean, string]> {
 		const [blob, type] = await getBinary(url, http);
